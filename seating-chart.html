@@ -2741,36 +2741,69 @@ function addGuestSheet(){
 // ------------------------------------------------ word export
 function loadJSZip(){if(window.JSZip)return Promise.resolve(window.JSZip);return new Promise(function(res,rej){var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';sc.onload=function(){res(window.JSZip)};sc.onerror=function(){rej(new Error('No se pudo cargar el generador de Word'))};document.head.appendChild(sc)})}
 function wEsc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-function wP(t,o){o=o||{};return '<w:p><w:pPr>'+(o.keep?'<w:keepNext/>':'')+'<w:spacing w:before="'+(o.before||0)+'" w:after="'+(o.after==null?60:o.after)+'"/>'+(o.center?'<w:jc w:val="center"/>':'')+'</w:pPr><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>'+(o.b?'<w:b/>':'')+(o.i?'<w:i/>':'')+'<w:sz w:val="'+(o.sz||22)+'"/>'+(o.color?'<w:color w:val="'+o.color+'"/>':'')+'</w:rPr><w:t xml:space="preserve">'+wEsc(t)+'</w:t></w:r></w:p>'}
-function wCell(t,w,o){o=o||{};return '<w:tc><w:tcPr><w:tcW w:w="'+w+'" w:type="dxa"/>'+(o.fill?'<w:shd w:val="clear" w:color="auto" w:fill="'+o.fill+'"/>':'')+'</w:tcPr>'+wP(t,{b:o.b,after:20,sz:o.sz||20,center:o.center})+'</w:tc>'}
-function wordXml(){
- var b='',total=ST.guests.length,seat=ST.guests.filter(function(g){return g.t}).length;
- b+=wP('Lista de invitados por mesa',{b:1,sz:40,center:1,after:40});
- b+=wP(ST.couple+(ST.subtitle?' · '+ST.subtitle:''),{sz:24,center:1,color:'8C6C3C',after:40});
- b+=wP(seat+' de '+total+' invitados sentados · actualizado '+new Date().toLocaleDateString('es-PR',{day:'numeric',month:'long',year:'numeric'}),{sz:18,center:1,i:1,color:'7A7268',after:240});
- ST.tables.forEach(function(t){var p=seated(t.id);if(!p.length)return;
-  b+=wP(tname(t)+'  ('+p.length+' de '+t.cap+')',{b:1,sz:28,color:'8C6C3C',before:200,after:60,keep:1});
-  p.forEach(function(g,i){b+=wP((i+1)+'. '+g.n+(g.s==='P'?'  (pendiente)':''),{after:20,keep:i<p.length-1})});
- });
- var un=ST.guests.filter(function(g){return !g.t});
- if(un.length){b+=wP('Sin mesa asignada ('+un.length+')',{b:1,sz:28,color:'B5524A',before:240,after:60,keep:1});un.forEach(function(g,i){b+=wP((i+1)+'. '+g.n,{after:20})})}
- b+='<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
- b+=wP('Índice alfabético',{b:1,sz:32,center:1,after:160});
- var bd='<w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(function(k){return '<w:'+k+' w:val="single" w:sz="4" w:space="0" w:color="D9CBB5"/>'}).join('')+'</w:tblBorders>';
- b+='<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>'+bd+'<w:tblCellMar><w:left w:w="100" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="7200"/><w:gridCol w:w="2880"/></w:tblGrid>';
- b+='<w:tr><w:trPr><w:tblHeader/></w:trPr>'+wCell('Invitado',7200,{b:1,fill:'F3EAD9'})+wCell('Mesa',2880,{b:1,fill:'F3EAD9',center:1})+'</w:tr>';
- ST.guests.slice().sort(function(a,c){return norm(a.n).localeCompare(norm(c.n))}).forEach(function(g){b+='<w:tr>'+wCell(g.n,7200)+wCell(g.t?tname(T(g.t)):'—',2880,{center:1})+'</w:tr>'});
- b+='</w:tbl>';
- return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+b+'<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>';
+function wR(t,o){o=o||{};return '<w:r><w:rPr><w:rFonts w:ascii="'+(o.font||'Calibri')+'" w:hAnsi="'+(o.font||'Calibri')+'" w:cs="'+(o.font||'Calibri')+'"/>'+(o.b?'<w:b/>':'')+(o.i?'<w:i/>':'')+(o.color?'<w:color w:val="'+o.color+'"/>':'')+(o.spc?'<w:spacing w:val="'+o.spc+'"/>':'')+'<w:sz w:val="'+(o.sz||22)+'"/></w:rPr><w:t xml:space="preserve">'+wEsc(t)+'</w:t></w:r>'}
+function wP(t,o){o=o||{};return '<w:p><w:pPr>'+(o.keep?'<w:keepNext/>':'')+(o.tabs||'')+'<w:spacing w:before="'+(o.before||0)+'" w:after="'+(o.after==null?60:o.after)+'"/>'+(o.center?'<w:jc w:val="center"/>':'')+'</w:pPr>'+(o.runs||wR(t,o))+'</w:p>'}
+var SERIF='Georgia',GOLD='B08D57',MUTE='7A7268',INK='2A2723';
+function wSect(o){var pb='<w:pgBorders w:offsetFrom="page">'+['top','left','bottom','right'].map(function(k){return '<w:'+k+' w:val="single" w:sz="6" w:space="22" w:color="D9BF8F"/>'}).join('')+'</w:pgBorders>';
+ return '<w:sectPr>'+(o.type?'<w:type w:val="'+o.type+'"/>':'')+'<w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="708" w:footer="708" w:gutter="0"/>'+pb+'<w:cols w:num="'+(o.cols||1)+'" w:space="360"/></w:sectPr>'}
+function wCard(t){
+ var head=t.type!=='round',bc=head?'D9BF8F':'E6DDD0',W=2520;
+ var bd='<w:tcBorders>'+['top','left','bottom','right'].map(function(k){return '<w:'+k+' w:val="single" w:sz="6" w:space="0" w:color="'+bc+'"/>'}).join('')+'</w:tcBorders>';
+ var x='<w:tc><w:tcPr><w:tcW w:w="'+W+'" w:type="dxa"/>'+bd+'<w:shd w:val="clear" w:color="auto" w:fill="'+(head?'FFFAF1':'FFFFFF')+'"/><w:tcMar><w:top w:w="140" w:type="dxa"/><w:bottom w:w="140" w:type="dxa"/></w:tcMar></w:tcPr>';
+ x+=wP(t.label,{font:SERIF,b:1,sz:t.type==='round'?40:23,color:INK,center:1,after:0});
+ x+=wP(t.type==='head'?'NOVIOS':'MESA',{sz:13,color:GOLD,spc:40,center:1,after:80});
+ seated(t.id).forEach(function(g){x+=wP(g.n,{sz:17,color:INK,center:1,after:10})});
+ return x+'</w:tc>';
 }
+function wEmpty(){return '<w:tc><w:tcPr><w:tcW w:w="2520" w:type="dxa"/></w:tcPr><w:p/></w:tc>'}
+function wordXml(){
+ var b='';
+ b+=wP('BIENVENIDOS',{sz:18,color:GOLD,spc:120,center:1,before:120,after:40});
+ b+=wP(ST.couple,{font:SERIF,sz:80,color:INK,center:1,after:0});
+ b+=wP('—————  ❦  —————',{sz:20,color:'D9BF8F',center:1,after:40});
+ b+=wP(ST.subtitle||'Seating Chart',{font:SERIF,sz:28,color:MUTE,center:1,after:280});
+ var ts=ST.tables.filter(function(t){return seated(t.id).length});
+ b+='<w:tbl><w:tblPr><w:tblW w:w="10080" w:type="dxa"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>'+'<w:gridCol w:w="2520"/>'.repeat(4)+'</w:tblGrid>';
+ for(var i=0;i<ts.length;i+=4){b+='<w:tr><w:trPr><w:cantSplit/></w:trPr>';for(var j=0;j<4;j++)b+=ts[i+j]?wCard(ts[i+j]):wEmpty();b+='</w:tr>'}
+ b+='</w:tbl><w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>';
+ var un=ST.guests.filter(function(g){return !g.t});
+ if(un.length)b+=wP('Sin mesa asignada: '+un.map(function(g){return g.n}).join(', '),{sz:18,color:'B5524A',center:1,before:160});
+ var url=qrUrl();
+ if(url&&window.__qrPng){
+  var img='<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="1188720" cy="1188720"/><wp:docPr id="1" name="QR"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="qr.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdQR"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1188720" cy="1188720"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  b+='<w:tbl><w:tblPr><w:tblW w:w="6200" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="2200"/><w:gridCol w:w="4000"/></w:tblGrid><w:tr><w:trPr><w:cantSplit/></w:trPr>';
+  b+='<w:tc><w:tcPr><w:tcW w:w="2200" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:spacing w:before="320" w:after="0"/><w:jc w:val="center"/></w:pPr>'+img+'</w:p></w:tc>';
+  b+='<w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>'+wP('Encuentra tu mesa',{font:SERIF,b:1,sz:34,color:INK,before:320,after:40})+wP('Escanea con la cámara de tu celular y escribe tu nombre.',{sz:19,color:MUTE,after:0})+'</w:tc></w:tr></w:tbl>';
+ }
+ b+='<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+ b+=wP('Índice de invitados',{font:SERIF,sz:52,color:INK,center:1,before:0,after:0});
+ b+=wP('—————  ❦  —————',{sz:20,color:'D9BF8F',center:1,after:120});
+ var L='',tabs='<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="3080"/></w:tabs>',items=[];
+ ST.guests.filter(function(g){return g.t}).sort(function(x,y){return norm(x.n).localeCompare(norm(y.n))}).forEach(function(g){
+  var l=norm(g.n)[0].toUpperCase();
+  if(l!==L){L=l;items.push({w:1.6,x:wP(l,{font:SERIF,b:1,sz:26,color:GOLD,before:70,after:0,keep:1}),h:1})}
+  var t=T(g.t),lab=t.type==='round'?t.label:t.short;
+  items.push({w:1,x:wP('',{tabs:tabs,after:0,runs:wR(g.n,{sz:17,color:INK})+'<w:r><w:rPr><w:color w:val="C9BBA6"/><w:sz w:val="17"/></w:rPr><w:tab/></w:r>'+wR(lab,{sz:17,b:1,color:GOLD})})});
+ });
+ var tot=items.reduce(function(a,i){return a+i.w},0),cols=[[],[],[]],acc=0,ci=0;
+ items.forEach(function(it,i){if(ci<2&&acc>=tot*(ci+1)/3&&!(items[i-1]&&items[i-1].h)){ci++}cols[ci].push(it.x);acc+=it.w});
+ b+='<w:tbl><w:tblPr><w:tblW w:w="10080" w:type="dxa"/>'+'<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="3360"/><w:gridCol w:w="3360"/><w:gridCol w:w="3360"/></w:tblGrid><w:tr>';
+ cols.forEach(function(c){b+='<w:tc><w:tcPr><w:tcW w:w="3360" w:type="dxa"/></w:tcPr>'+(c.join('')||'<w:p/>')+'</w:tc>'});
+ b+='</w:tr></w:tbl>';
+ return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>'+b+wSect({cols:1})+'</w:body></w:document>';
+}
+function qrPngB64(url){try{var q=qrcode(0,'M');q.addData(url);q.make();var n=q.getModuleCount(),c=10,m=3,sz=(n+2*m)*c,cv=document.createElement('canvas');cv.width=cv.height=sz;var x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,sz,sz);x.fillStyle='#000';for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))x.fillRect((k+m)*c,(r+m)*c,c,c);return cv.toDataURL('image/png').split(',')[1]}catch(e){return null}}
 async function exportWord(){
- var JSZip=await loadJSZip(),z=new JSZip();
- z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+ var JSZip=await loadJSZip(),z=new JSZip(),url=qrUrl();
+ window.__qrPng=url?qrPngB64(url):null;
+ z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+ z.file('word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+(window.__qrPng?'<Relationship Id="rIdQR" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/qr.png"/>':'')+'</Relationships>');
+ if(window.__qrPng)z.file('word/media/qr.png',window.__qrPng,{base64:true});
  z.file('word/document.xml',wordXml());
  var blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
  var d=new Date(),stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
- await download('lista-invitados-mesas-'+stamp+'.docx',blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+ await download('seating-chart-'+stamp+'.docx',blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 }
 function wordBtn(cls){return h('button',{class:cls||'btn',onclick:function(){exportWord().catch(function(e){toast(e.message||'No se pudo crear el Word')})}},['Word'])}
 
